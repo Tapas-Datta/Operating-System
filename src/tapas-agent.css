@@ -1,0 +1,83 @@
+.tapas-agent{display:flex;flex-direction:column;gap:16px;min-height:360px;height:100%;color:var(--text-primary,#f3f4fa)}
+.tapas-agent-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.tapas-agent-heading h2{margin:4px 0;font-size:25px}.tapas-agent-heading p,.tapas-agent-footer>span{color:#9ca3b8;font-size:13px}
+.tapas-agent-kicker{font-size:10px;letter-spacing:.18em;color:#9b8cff;font-weight:800}.tapas-agent-status{font-size:12px;color:#8ee2b2;white-space:nowrap}
+.tapas-agent-messages{display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1;min-height:180px;max-height:420px;padding:4px}
+.tapas-agent-message{max-width:88%;padding:12px 14px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.045);white-space:pre-wrap}
+.tapas-agent-message.user{align-self:flex-end;background:rgba(123,108,238,.18);border-color:rgba(151,137,255,.25)}
+.tapas-agent-message small{display:block;font-size:9px;letter-spacing:.12em;color:#a99dff;font-weight:800;margin-bottom:6px}.tapas-agent-message p{font-size:13px;line-height:1.55;margin:0}
+.tapas-agent-footer{display:flex;flex-direction:column;gap:9px}.tapas-agent-input{display:flex;gap:9px;align-items:stretch}
+.tapas-agent-input textarea{flex:1;resize:vertical;min-width:0;border:1px solid rgba(255,255,255,.13);border-radius:12px;background:rgba(10,12,22,.55);color:inherit;padding:12px;font:inherit;font-size:13px}
+.tapas-agent-input button{border:0;border-radius:12px;padding:0 16px;background:#7666df;color:white;font-weight:700}.tapas-agent-input button:disabled{opacity:.5;cursor:not-allowed}
+
+
+.tapas-agent-permission {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin: 16px 4px;
+  padding: 20px;
+  border: 1px solid rgba(139, 116, 255, 0.4);
+  border-radius: 16px;
+  background: rgba(89, 72, 170, 0.13);
+  color: #f4f1ff;
+}
+
+.tapas-agent-permission-icon {
+  font-size: 28px;
+}
+
+.tapas-agent-permission-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tapas-agent-permission-content h3 {
+  margin: 8px 0;
+  font-size: 18px;
+}
+
+.tapas-agent-permission-content p {
+  color: #aaa9bd;
+  font-size: 13px;
+}
+
+.tapas-agent-permission-path {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #c5b7ff;
+  overflow-wrap: anywhere;
+  font-family: monospace;
+}
+
+.tapas-agent-permission-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tapas-agent-permission-actions button {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tapas-agent-cancel {
+  background: #343548;
+  color: white;
+}
+
+.tapas-agent-approve {
+  background: #7460d8;
+  color: white;
+}
+
+.tapas-agent-permission-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

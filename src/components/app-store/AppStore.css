@@ -1,0 +1,19 @@
+.tap-store{height:100%;overflow:auto;padding:30px;color:var(--text-primary,#f5f6fa);background:var(--surface,#111827);box-sizing:border-box}
+.tap-store-hero{display:flex;align-items:center;justify-content:space-between;padding:28px 30px;border:1px solid rgba(255,255,255,.09);border-radius:20px;background:linear-gradient(120deg,rgba(79,105,180,.22),rgba(83,66,132,.12))}
+.tap-store-eyebrow{font-size:10px;letter-spacing:2px;font-weight:700;opacity:.65;margin:0 0 10px}
+.tap-store-hero h1{font-size:32px;letter-spacing:-1px;margin:0 0 8px}
+.tap-store-hero p:last-child,.tap-store-section-heading p{margin:0;color:var(--text-secondary,#aab2c5);font-size:13px}
+.tap-store-mark{width:66px;height:66px;border-radius:18px;display:grid;place-items:center;font-size:34px;background:rgba(150,157,255,.14);border:1px solid rgba(180,185,255,.2)}
+.tap-store-section-heading{display:flex;align-items:center;justify-content:space-between;margin:30px 2px 16px}
+.tap-store-section-heading h2{font-size:18px;margin:0 0 5px}
+.tap-store-count,.tap-store-category{font-size:11px;color:var(--text-secondary,#aab2c5);border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:20px}
+.tap-store-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.tap-store-card{min-height:205px;padding:18px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.035);display:flex;flex-direction:column}
+.tap-store-card-top{display:flex;align-items:center;justify-content:space-between}
+.tap-store-app-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;font-size:25px;background:rgba(255,255,255,.08)}
+.tap-store-card h3{font-size:16px;margin:16px 0 6px}
+.tap-store-card>p{font-size:12px;line-height:1.55;color:var(--text-secondary,#aab2c5);margin:0 0 18px;flex:1}
+.tap-store-action{border:0;border-radius:9px;padding:10px 14px;font-weight:700;font-size:12px;cursor:pointer;color:#101522;background:#dce7ff}
+.tap-store-action:hover{filter:brightness(1.08)}
+.tap-store-action.is-installed{color:var(--text-primary,#f5f6fa);background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14)}
+.tap-store-footnote{font-size:11px;line-height:1.5;color:var(--text-secondary,#aab2c5);margin:20px 2px 4px}
