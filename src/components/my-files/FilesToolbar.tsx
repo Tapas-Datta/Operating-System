@@ -6,6 +6,7 @@ type Props = {
   onRefresh: () => void;
   onNewFile: () => void;
   onNewFolder: () => void;
+  onImportFiles?: (files: FileList | null) => void;
   sortBy: "name" | "size" | "modified";
   onSortChange: (value: "name" | "size" | "modified") => void;
 };
@@ -37,6 +38,7 @@ export default function FilesToolbar(props: Props) {
       </select>
       <button className="myfiles-new-folder" onClick={props.onNewFile}>+ New File</button>
       <button className="myfiles-new-folder" onClick={props.onNewFolder}>+ New Folder</button>
+      {props.onImportFiles && <label className="myfiles-new-folder" style={{ cursor: "pointer" }}>Import Files<input type="file" multiple hidden onChange={event => { props.onImportFiles?.(event.target.files); event.currentTarget.value = ""; }} /></label>}
     </div>
   );
 }

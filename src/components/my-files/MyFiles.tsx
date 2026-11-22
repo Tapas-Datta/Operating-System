@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke, webFiles, isDesktop } from "../../platform";
 import { useFiles } from "../../hooks/useFiles";
 import type { FileDialogState, FileEntry } from "../../types/file";
 import FilesSidebar, { type StorageInfo } from "./FilesSidebar";
@@ -89,7 +89,7 @@ export default function MyFiles({
 
   const refreshTrash = useCallback(async () => {
     try {
-      setTrash(await invoke<TrashEntry[]>("list_trash"));
+      setTrash(await platformInvoke<TrashEntry[]>("list_trash"));
     } catch (error) {
       console.error("Recycle Bin:", error);
     }
@@ -97,11 +97,26 @@ export default function MyFiles({
 
   const refreshStorage = useCallback(async () => {
     try {
-      setStorage(await invoke<StorageInfo>("get_storage_info"));
+      setStorage(await platformInvoke<StorageInfo>("get_storage_info"));
     } catch (error) {
       console.error("Storage information:", error);
     }
   }, []);
+
+  const importSelectedFiles = async (filesList: FileList | null) => {
+    if (!filesList?.length) return;
+    try {
+      if (isDesktop()) {
+        window.alert("Use the desktop file import workflow in the native app.");
+        return;
+      }
+      await webFiles.importFiles(filesList, files.currentPath);
+      await files.loadFiles(files.currentPath);
+      await refreshStorage();
+    } catch (error) {
+      window.alert(String(error));
+    }
+  };
 
   useEffect(() => {
     void refreshTrash();
@@ -241,9 +256,9 @@ export default function MyFiles({
       const destination = joinPath(files.currentPath, entry.name);
       if (destination === entry.path) continue;
       if (clipboard.mode === "copy") {
-        await invoke("copy_entry", { path: entry.path, destination });
+        await platformInvoke("copy_entry", { path: entry.path, destination });
       } else {
-        await invoke("move_entry", { path: entry.path, destination });
+        await platformInvoke("move_entry", { path: entry.path, destination });
         setFavorites((prev) => prev.map((path) =>
           path === entry.path ? destination : path
         ));
@@ -257,7 +272,7 @@ export default function MyFiles({
 
   const moveToTrash = async (entries: FileEntry[]) => {
     for (const entry of entries) {
-      await invoke("delete_entry", { path: entry.path });
+      await platformInvoke("delete_entry", { path: entry.path });
       setFavorites((prev) => prev.filter((path) =>
         path !== entry.path && !path.startsWith(`${entry.path}/`)
       ));
@@ -317,7 +332,7 @@ export default function MyFiles({
 
   const restoreTrash = async (entry: TrashEntry) => {
     try {
-      await invoke("restore_entry", { id: entry.id });
+      await platformInvoke("restore_entry", { id: entry.id });
       await refreshTrash();
       await refreshStorage();
       if (activeView === "folder") await files.loadFiles(files.currentPath);
@@ -329,7 +344,7 @@ export default function MyFiles({
   const permanentlyDelete = async (entry: TrashEntry) => {
     if (!window.confirm(`Permanently delete "${entry.name}"? This cannot be undone.`)) return;
     try {
-      await invoke("permanently_delete_entry", { id: entry.id });
+      await platformInvoke("permanently_delete_entry", { id: entry.id });
       await refreshTrash();
       await refreshStorage();
     } catch (error) {
@@ -341,7 +356,7 @@ export default function MyFiles({
     if (!trash.length) return;
     if (!window.confirm("Permanently delete everything in the Recycle Bin? This cannot be undone.")) return;
     try {
-      await invoke("empty_trash");
+      await platformInvoke("empty_trash");
       await refreshTrash();
       await refreshStorage();
     } catch (error) {
@@ -359,6 +374,7 @@ export default function MyFiles({
         recent={recent}
         storage={storage}
         trashCount={trash.length}
+        storageLabel={isDesktop() ? "Home directory access" : "Browser workspace"}
         onNavigate={navigate}
         onViewChange={changeView}
       />
@@ -375,6 +391,7 @@ export default function MyFiles({
           }}
           onNewFile={() => openDialog("file")}
           onNewFolder={() => openDialog("folder")}
+          onImportFiles={isDesktop() ? undefined : importSelectedFiles}
           sortBy={sortBy}
           onSortChange={setSortBy}
         />
@@ -384,6 +401,7 @@ export default function MyFiles({
             <button disabled={!selected.length || activeView === "trash"} onClick={() => copySelected("copy")}>Copy</button>
             <button disabled={!selected.length || activeView === "trash"} onClick={() => copySelected("cut")}>Cut</button>
             <button disabled={!clipboard || activeView !== "folder"} onClick={() => void pasteEntries()}>Paste</button>
+            {!isDesktop() && <button disabled={selected.length !== 1 || sourceEntries.find(e => e.path === selected[0])?.isDir !== false} onClick={() => { const entry = sourceEntries.find(e => e.path === selected[0]); if (entry) void webFiles.exportFile(entry.path).catch(error => window.alert(String(error))); }}>Export</button>}
             <button disabled={!selected.length || activeView === "trash"} onClick={() => {
               const entries = sourceEntries.filter((entry) => selected.includes(entry.path));
               void moveToTrash(entries);
@@ -490,7 +508,7 @@ export default function MyFiles({
               event.preventDefault();
               if (!dragged || !entry.isDir || dragged.path === entry.path) return;
               const destination = joinPath(entry.path, dragged.name);
-              void invoke("move_entry", { path: dragged.path, destination })
+              void platformInvoke("move_entry", { path: dragged.path, destination })
                 .then(() => files.loadFiles(files.currentPath))
                 .catch((error) => window.alert(String(error)))
                 .finally(() => setDragged(null));
@@ -501,7 +519,7 @@ export default function MyFiles({
 
         <div className="myfiles-footer">
           <span>{activeView === "trash" ? `${trash.length} deleted items` : `${filteredEntries.length} items`}</span>
-          <span>{viewTitle} · Home directory access</span>
+          <span>{viewTitle} · {isDesktop() ? "Home directory access" : "Browser workspace"}</span>
         </div>
       </section>
 

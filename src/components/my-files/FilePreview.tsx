@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke } from "../../platform";
 
 type Props = {
   path: string;
@@ -15,7 +15,7 @@ export default function FilePreview({ path, name, onClose }: Props) {
   useEffect(() => {
     let active = true;
 
-    invoke<string>("read_file", { path })
+    platformInvoke<string>("read_file", { path })
       .then((result) => {
         if (active) setContent(result);
       })

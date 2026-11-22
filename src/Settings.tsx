@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke, isDesktop } from "./platform";
 
 type SettingsProps = {
   theme: string;
@@ -288,9 +288,13 @@ function Settings({
                 TAPAS OS does not currently control the Mac system volume
                 or output devices. Open macOS System Settings to manage them.
               </p>
-              <button className="settings-option" onClick={() => invoke("open_macos_system_settings")}>
-                Open macOS System Settings ↗
-              </button>
+              {isDesktop() ? (
+                <button className="settings-option" onClick={() => void platformInvoke("open_macos_system_settings").catch(error => alert(String(error)))}>
+                  Open macOS System Settings ↗
+                </button>
+              ) : (
+                <small className="settings-note">Native sound controls are available in the installed Desktop app. Your browser manages web audio settings.</small>
+              )}
             </div>
           </>
         )}
@@ -331,16 +335,18 @@ function Settings({
                 Open macOS System Settings to view and manage the actual
                 hardware or operating-system configuration.
               </p>
-              <button
-                className="settings-option"
-                onClick={() => {
-                  void invoke("open_macos_system_settings").catch(error => {
-                    alert(String(error));
-                  });
-                }}
-              >
-                Open macOS System Settings ↗
-              </button>
+              {isDesktop() ? (
+                <button
+                  className="settings-option"
+                  onClick={() => {
+                    void platformInvoke("open_macos_system_settings").catch(error => alert(String(error)));
+                  }}
+                >
+                  Open macOS System Settings ↗
+                </button>
+              ) : (
+                <small className="settings-note">These controls depend on your operating system and are available only in the installed Desktop app.</small>
+              )}
               <small className="settings-note">
                 TAPAS OS does not report or change a setting unless it can
                 verify the actual system state.

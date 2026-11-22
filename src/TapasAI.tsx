@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke, isDesktop } from "./platform";
 import "./tapas-agent.css";
 
 type Action = {
@@ -29,7 +29,7 @@ export default function TapasAI({
 }) {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", text: "Hi! I’m TAPAS AI. I can inspect folders, create folders or empty files, and open TAPAS apps. What should I do?" }
+    { role: "assistant", text: "Hi! I’m TAPAS AI. I can inspect your workspace and, with your approval, create folders or empty files. What should I do?" }
   ]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
@@ -45,9 +45,11 @@ export default function TapasAI({
     setStatus("Planning task…");
 
     try {
-      const plan = await invoke<Reply>("ask_tapas_ai", {
+      const plan = await platformInvoke<Reply>("ask_tapas_ai", {
         prompt: request,
-        context: "TAPAS OS desktop. File operations are restricted to the user's Home directory."
+        context: isDesktop()
+          ? "TAPAS OS desktop. File operations are restricted to the user's Home directory."
+          : "TAPAS OS web demo. File operations are restricted to the TAPAS Workspace stored in this browser."
       });
 
       if (plan.message) {
@@ -86,13 +88,13 @@ export default function TapasAI({
         if (action.type === "list_directory") {
           setStatus(`Inspecting ${path || "Home"}…`);
 
-          const entries = await invoke<Array<{name: string; is_dir: boolean}>>(
+          const entries = await platformInvoke<Array<{name: string; is_dir?: boolean; isDir?: boolean}>>(
             "list_directory",
             { path: path || null }
           );
 
           const summary = entries.slice(0, 40)
-            .map(e => `${e.is_dir ? "📁" : "📄"} ${e.name}`)
+            .map(e => `${(e.isDir ?? e.is_dir) ? "📁" : "📄"} ${e.name}`)
             .join("\n") || "This folder is empty.";
 
           setMessages(m => [...m, {
@@ -141,7 +143,7 @@ export default function TapasAI({
     setStatus("Executing approved action…");
 
     try {
-      await invoke(action.type, { path });
+      await platformInvoke(action.type, { path });
 
       setMessages(m => [...m, {
         role: "assistant",
@@ -181,9 +183,9 @@ export default function TapasAI({
     <section className="tapas-agent">
       <header className="tapas-agent-heading">
         <div>
-          <span className="tapas-agent-kicker">DESKTOP AGENT</span>
+          <span className="tapas-agent-kicker">{isDesktop() ? "DESKTOP AGENT" : "WEB WORKSPACE AGENT"}</span>
           <h2>TAPAS AI</h2>
-          <p>Plan tasks and safely operate TAPAS OS.</p>
+          <p>{isDesktop() ? "Plan tasks and safely operate TAPAS OS." : "Plan tasks and safely manage your browser workspace."}</p>
         </div>
         <span className="tapas-agent-status">
           ● {busy ? "Working" : pendingAction ? "Awaiting approval" : "Ready"}

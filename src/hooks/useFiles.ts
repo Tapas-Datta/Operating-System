@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke } from "../platform";
 import type { FileEntry } from "../types/file";
 
 export function useFiles() {
@@ -13,7 +13,7 @@ export function useFiles() {
     setError("");
 
     try {
-      const result = await invoke<FileEntry[]>("list_directory", {
+      const result = await platformInvoke<FileEntry[]>("list_directory", {
         path: path || null,
       });
       setEntries(result);
@@ -32,18 +32,18 @@ export function useFiles() {
 
   const createFile = async (name: string) => {
     const path = currentPath ? `${currentPath}/${name}` : name;
-    await invoke("create_file", { path });
+    await platformInvoke("create_file", { path });
     await loadFiles(currentPath);
   };
 
   const createFolder = async (name: string) => {
     const path = currentPath ? `${currentPath}/${name}` : name;
-    await invoke("create_folder", { path });
+    await platformInvoke("create_folder", { path });
     await loadFiles(currentPath);
   };
 
   const renameEntry = async (entry: FileEntry, newName: string) => {
-    await invoke("rename_entry", {
+    await platformInvoke("rename_entry", {
       path: entry.path,
       newName,
     });
@@ -51,7 +51,7 @@ export function useFiles() {
   };
 
   const deleteEntry = async (entry: FileEntry) => {
-    await invoke("delete_entry", { path: entry.path });
+    await platformInvoke("delete_entry", { path: entry.path });
     await loadFiles(currentPath);
   };
 

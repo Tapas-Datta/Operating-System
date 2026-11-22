@@ -14,6 +14,7 @@ type Props = {
   recent: FileEntry[];
   storage: StorageInfo | null;
   trashCount: number;
+  storageLabel?: string;
   onNavigate: (path: string) => void;
   onViewChange: (view: string, category?: string) => void;
 };
@@ -98,7 +99,7 @@ export default function FilesSidebar(props: Props) {
       </div>
 
       <div className="myfiles-sidebar-footer">
-        <span className="myfiles-status-dot" />Home directory access
+        <span className="myfiles-status-dot" />{props.storageLabel ?? "Home directory access"}
       </div>
     </aside>
   );

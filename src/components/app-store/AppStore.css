@@ -17,3 +17,16 @@
 .tap-store-action:hover{filter:brightness(1.08)}
 .tap-store-action.is-installed{color:var(--text-primary,#f5f6fa);background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14)}
 .tap-store-footnote{font-size:11px;line-height:1.5;color:var(--text-secondary,#aab2c5);margin:20px 2px 4px}
+.tap-store-toolbar{display:grid;gap:12px;margin:0 0 18px}
+.tap-store-search{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.13);border-radius:11px;background:rgba(255,255,255,.045);color:var(--text-primary,#f5f6fa);padding:12px 14px;font:inherit;font-size:13px;outline:none}
+.tap-store-search:focus{border-color:rgba(170,190,255,.55)}
+.tap-store-filters{display:flex;gap:7px;flex-wrap:wrap}
+.tap-store-filter,.tap-store-secondary{border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:7px 11px;background:rgba(255,255,255,.035);color:var(--text-secondary,#aab2c5);font-size:11px;cursor:pointer}
+.tap-store-filter.active{background:rgba(190,205,255,.16);border-color:rgba(190,205,255,.35);color:var(--text-primary,#f5f6fa)}
+.tap-store-card.is-selected{border-color:rgba(170,190,255,.42)}
+.tap-store-detail{font-size:11px!important;opacity:.85;flex:initial!important;margin-top:-8px!important}
+.tap-store-card-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:auto}
+.tap-store-card-actions .tap-store-action{flex:1;min-width:70px}
+.tap-store-secondary{border-radius:9px;padding:10px 11px}
+.tap-store-empty{padding:30px;text-align:center;color:var(--text-secondary,#aab2c5)}
+@media(max-width:600px){.tap-store{padding:18px}.tap-store-hero{padding:20px}.tap-store-hero h1{font-size:26px}.tap-store-section-heading{align-items:flex-start;gap:12px}}

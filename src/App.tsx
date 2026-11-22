@@ -1,13 +1,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { platformInvoke, isDesktop } from "./platform";
 
 import Settings from "./Settings";
 import MyFiles from "./components/my-files/MyFiles";
 import Browser from "./components/browser/Browser";
 import TapasAI from "./TapasAI";
-import AppStore, { type StoreApp } from "./components/app-store/AppStore";
+import AppStore, { BUILT_IN_APPS, STORE_CATALOG, WEB_APPS, type StoreApp } from "./components/app-store/AppStore";
 import Notes from "./components/app-store/apps/Notes";
 import Calculator from "./components/app-store/apps/Calculator";
 import Gallery from "./components/app-store/apps/Gallery";
@@ -25,7 +25,11 @@ type AppName =
   | "Terminal"
   | "Notes"
   | "Calculator"
-  | "Gallery";
+  | "Gallery"
+  | "GitHub" | "YouTube" | "Gmail" | "Google Drive" | "ChatGPT" | "Notion"
+  | "Canva" | "Figma" | "Wikipedia" | "Khan Academy" | "Replit" | "CodePen"
+  | "Stack Overflow" | "Google Calendar" | "Spotify" | "Google Maps"
+  | (string & {});
 
 type Layout = "normal" | "maximized" | "left" | "right";
 
@@ -138,9 +142,9 @@ function AppIcon({ name }: { name: AppName }) {
             <path d="m19 23 11 9-11 9M35 42h11" stroke="url(#terminalLine)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
           </>
         )}
-        {(name === "Notes" || name === "Calculator" || name === "Gallery") && (
+        {STORE_CATALOG.some((app) => app.id === name) && (
           <text x="32" y="43" textAnchor="middle" fontSize="35">
-            {name === "Notes" ? "📝" : name === "Calculator" ? "🧮" : "🖼️"}
+            {STORE_CATALOG.find((app) => app.id === name)?.icon}
           </text>
         )}
         <defs>
@@ -186,11 +190,7 @@ const APPS: { name: AppName; icon: string }[] = [
   { name: "Terminal", icon: "⌘" },
 ];
 
-const OPTIONAL_APPS: { name: StoreApp["id"]; icon: string }[] = [
-  { name: "Notes", icon: "📝" },
-  { name: "Calculator", icon: "🧮" },
-  { name: "Gallery", icon: "🖼️" },
-];
+const OPTIONAL_APPS: { name: StoreApp["id"]; icon: string }[] = BUILT_IN_APPS.map((app) => ({ name: app.id, icon: app.icon }));
 
 function loadInstalledApps(): StoreApp["id"][] {
   try {
@@ -200,18 +200,17 @@ function loadInstalledApps(): StoreApp["id"][] {
 
     if (!Array.isArray(value)) return [];
 
-    return OPTIONAL_APPS
-      .map((app) => app.name)
+    return [...OPTIONAL_APPS.map((app) => app.name), ...WEB_APPS.map((app) => app.id)]
       .filter((name) => value.includes(name));
   } catch {
     return [];
   }
 }
 
-function loadAppOrder(key: string): AppName[] {
+function loadAppOrder(key: string, includeInstalled = true): AppName[] {
   const defaults = [
     ...APPS.map((item) => item.name),
-    ...loadInstalledApps(),
+    ...(includeInstalled ? loadInstalledApps() : []),
   ];
 
   try {
@@ -368,14 +367,13 @@ function App() {
     () => loadAppOrder("tapas-desktop-app-order")
   );
   const [dockOrder, setDockOrder] = useState<AppName[]>(
-    () => loadAppOrder("tapas-dock-app-order")
+    () => loadAppOrder("tapas-dock-app-order", false)
   );
 
   const availableApps = [
     ...APPS,
-    ...OPTIONAL_APPS.filter((app) =>
-      installedApps.includes(app.name)
-    ),
+    ...OPTIONAL_APPS.filter((app) => installedApps.includes(app.name)),
+    ...WEB_APPS.filter((app) => installedApps.includes(app.id)).map((app) => ({ name: app.id as AppName, icon: app.icon })),
   ];
   const appOrderDragRef = useRef<{
     source: "desktop" | "dock";
@@ -408,17 +406,11 @@ function App() {
       current.includes(name) ? current : [...current, name]
     );
 
-    setDockOrder((current) =>
-      current.includes(name) ? current : [...current, name]
-    );
-
     setDesktopPositions((current) => ({
       ...current,
       [name]: current[name] ?? {
         x: Math.max(24, window.innerWidth - 220),
-        y: 40 + OPTIONAL_APPS.findIndex(
-          (app) => app.name === name
-        ) * 112,
+        y: 40 + Math.max(0, installedApps.length) * 8,
       },
     }));
   };
@@ -429,10 +421,6 @@ function App() {
     );
 
     setDesktopOrder((current) =>
-      current.filter((app) => app !== name)
-    );
-
-    setDockOrder((current) =>
       current.filter((app) => app !== name)
     );
 
@@ -692,8 +680,9 @@ function App() {
     let active = true;
 
     const refreshSystemStatus = async () => {
+      if (!isDesktop()) return;
       try {
-        const status = await invoke<SystemStatus>("get_system_status");
+        const status = await platformInvoke<SystemStatus>("get_system_status");
         if (active) setSystemStatus(status);
       } catch (error) {
         console.error("Unable to read system status:", error);
@@ -750,13 +739,18 @@ function App() {
 
   // Open or restore application
   const openApp = (name: AppName) => {
-    const targetName: AppName = name === "Sicily AI" ? "Browser" : name;
+    const storeWebApp = WEB_APPS.find((app) => app.id === name);
+    const targetName: AppName = (name === "Sicily AI" || storeWebApp) ? "Browser" : name;
 
-    if (name === "Sicily AI") {
-      setBrowserLaunchRequest({
-        id: Date.now(),
-        url: "https://sicily-ai.vercel.app/",
-      });
+    if (name === "Sicily AI" || storeWebApp) {
+      const url = storeWebApp?.url ?? "https://sicily-ai.vercel.app/";
+      if (!isDesktop()) {
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (!opened) window.alert("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
+        closeStartMenu();
+        return;
+      }
+      setBrowserLaunchRequest({ id: Date.now(), url });
     }
 
     const nextZ = zCounter + 1;
@@ -1134,6 +1128,7 @@ function App() {
           installedApps={installedApps}
           onInstall={installApp}
           onUninstall={uninstallApp}
+          onOpen={(app) => openApp(app.id as AppName)}
         />
       );
     }

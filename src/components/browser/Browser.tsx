@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { isDesktop } from "../../platform";
 import "./browser.css";
 
 type BrowserTab = {
@@ -77,7 +78,7 @@ type BrowserProps = {
   } | null;
 };
 
-function Browser({ launchRequest }: BrowserProps) {
+function DesktopBrowser({ launchRequest }: BrowserProps) {
   const pageRef = useRef<HTMLDivElement>(null);
   const createdViews = useRef(new Set<number>());
   const creatingViews = useRef(new Set<number>());
@@ -674,4 +675,99 @@ function Browser({ launchRequest }: BrowserProps) {
   );
 }
 
-export default Browser;
+function WebBrowser({ launchRequest }: BrowserProps) {
+  const [address, setAddress] = useState("");
+  const [message, setMessage] = useState("Web demo · Websites open in a new browser tab");
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>(
+    () => readStorage("tapas-browser-shortcuts", DEFAULT_SHORTCUTS)
+  );
+  const [showAddShortcut, setShowAddShortcut] = useState(false);
+  const [shortcutName, setShortcutName] = useState("");
+  const [shortcutUrl, setShortcutUrl] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (launchRequest?.url) setAddress(launchRequest.url);
+  }, [launchRequest?.id]);
+
+  useEffect(() => {
+    localStorage.setItem("tapas-browser-shortcuts", JSON.stringify(shortcuts));
+  }, [shortcuts]);
+
+  const openWebsite = (value: string) => {
+    const url = resolveAddress(value);
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    const opened = window.open(url, "_blank");
+    if (!opened) {
+      setMessage("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
+      return;
+    }
+    opened.opener = null;
+    setHistory(previous => [url, ...previous.filter(item => item !== url)].slice(0, 20));
+    setAddress(url);
+    setMessage(`Opened ${url} in a new browser tab.`);
+  };
+
+  const addShortcut = (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = shortcutName.trim();
+    const url = resolveAddress(shortcutUrl);
+    if (!name || !url || !/^https?:\/\//i.test(url)) return;
+    setShortcuts(previous => [...previous, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: name.slice(0, 24), url,
+    }]);
+    setShortcutName("");
+    setShortcutUrl("");
+    setShowAddShortcut(false);
+  };
+
+  return (
+    <div className="browser-shell">
+      <div className="browser-tabs">
+        <div className="browser-tab active"><span>🌐</span><span className="browser-tab-title">TAPAS Web</span></div>
+      </div>
+      <div className="browser-toolbar">
+        <button className="browser-nav-button" onClick={() => setMessage("Use your browser's Back button to return from external websites.")} title="Back">←</button>
+        <button className="browser-nav-button" onClick={() => setMessage("External pages are managed by your browser.")} title="Forward">→</button>
+        <button className="browser-nav-button" onClick={() => openWebsite(address)} title="Open again">⟳</button>
+        <button onClick={() => { setAddress(""); setMessage("Web demo · Ready to explore"); }} title="Home">⌂</button>
+        <form className="browser-address-form" onSubmit={event => { event.preventDefault(); openWebsite(address); }}>
+          <span>⌕</span>
+          <input value={address} onChange={event => setAddress(event.target.value)} placeholder="Search or enter a website address" />
+          <button type="submit">Open</button>
+        </form>
+      </div>
+      <div className="browser-home">
+        <div className="browser-home-content">
+          <div className="browser-home-logo">T</div>
+          <h1>TAPAS Browser</h1>
+          <p>{message}</p>
+          <div className="browser-shortcuts">
+            {shortcuts.map(item => (
+              <button className="browser-shortcut" key={item.id} onClick={() => openWebsite(item.url)}>
+                <img src={faviconUrl(item.url)} alt="" />
+                <span>{item.name}</span>
+              </button>
+            ))}
+            <button className="browser-shortcut" onClick={() => setShowAddShortcut(true)}><span>＋</span><span>Add shortcut</span></button>
+          </div>
+          {showAddShortcut && (
+            <form className="browser-shortcut-form" onSubmit={addShortcut}>
+              <input value={shortcutName} onChange={event => setShortcutName(event.target.value)} placeholder="Name" required />
+              <input value={shortcutUrl} onChange={event => setShortcutUrl(event.target.value)} placeholder="https://example.com" required />
+              <button type="submit">Save</button>
+              <button type="button" onClick={() => setShowAddShortcut(false)}>Cancel</button>
+            </form>
+          )}
+          {history.length > 0 && <div className="browser-web-history"><strong>Recently opened</strong>{history.slice(0, 5).map(url => <button key={url} onClick={() => openWebsite(url)}>{url}</button>)}</div>}
+          <small className="browser-web-note">For security and compatibility, the Web demo opens websites in your browser instead of embedding them inside TAPAS OS. The installed Desktop app retains its native browser window.</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Browser(props: BrowserProps) {
+  return isDesktop() ? <DesktopBrowser {...props} /> : <WebBrowser {...props} />;
+}
