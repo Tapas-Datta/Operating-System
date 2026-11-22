@@ -1,18 +1,5 @@
 # TAPAS OS — Custom Control Center
 
-<p align="center">
-  <strong>A native-inspired Control Center for the TAPAS OS desktop environment.</strong>
-</p>
-
-<p align="center">
-  ![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey)
-  ![Framework](https://img.shields.io/badge/Framework-Tauri-blue)
-  ![Frontend](https://img.shields.io/badge/Frontend-React%20%7C%20TypeScript-blue)
-  ![Backend](https://img.shields.io/badge/Backend-Rust-orange)
-  ![Status](https://img.shields.io/badge/Status-Development-orange)
-</p>
-
----
 
 ## Overview
 
