@@ -1,0 +1,10 @@
+node_modules
+src-tauri/target
+.git
+.vercel
+.env
+.env.*
+dist
+*.zip
+*.dmg
+*.app

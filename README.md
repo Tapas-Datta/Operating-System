@@ -282,3 +282,15 @@ Add the project's actual license information here once its licensing terms have 
   <strong>Built as part of TAPAS OS</strong><br/>
   <sub>AI assistance with security, transparency, and user control.</sub>
 </p>
+
+## Browser Compatibility Update
+
+TAPAS OS includes an updated browser experience with:
+
+- Website navigation and search.
+- YouTube individual video embed support.
+- YouTube URL compatibility handling.
+- Browser navigation history and shortcuts.
+- Basic privacy filtering in the native desktop WebView.
+
+Note: Some websites restrict iframe embedding. The native desktop browser and browser-based web edition have different capabilities.

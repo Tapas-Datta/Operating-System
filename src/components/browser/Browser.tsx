@@ -577,9 +577,6 @@ function DesktopBrowser({ launchRequest, visible = true }: BrowserProps) {
           title="Open Download Manager"
         >⬇</button>
 
-        <span className="browser-ad-status" title="Basic ad and tracker filtering">
-          ◈ Ad filter ON
-        </span>
       </div>
 
       {showDownloads && (
@@ -747,6 +744,9 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   const [shortcutName, setShortcutName] = useState("");
   const [shortcutUrl, setShortcutUrl] = useState("");
   const [frameKeys, setFrameKeys] = useState<Record<number, number>>({});
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [frameKey, setFrameKey] = useState(0);
 
   const activeTab = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
   const currentUrl = activeTab?.url ?? "";
@@ -878,6 +878,9 @@ function WebBrowser({ launchRequest }: BrowserProps) {
     setMessage("TAPAS Web · Ready to explore");
   };
 
+  const youtubeUrl = currentUrl ? youtubeEmbedUrl(currentUrl) : null;
+  const isYoutube = currentUrl ? isYouTubePage(currentUrl) : false;
+
   const addShortcut = (event: React.FormEvent) => {
     event.preventDefault();
     const name = shortcutName.trim();
@@ -903,6 +906,7 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   return (
     <div className="browser-shell browser-web-mode">
       <div className="browser-tabs">
+<<<<<<< HEAD
         {tabs.map((tab) => (
           <div
             key={tab.id}
@@ -1046,6 +1050,67 @@ function WebBrowser({ launchRequest }: BrowserProps) {
                       app uses a native WebView for broader website compatibility.
                     </small>
                   </div>
+=======
+        <div className="browser-tab active">
+          <span>🌐</span>
+          <span className="browser-tab-title">{currentUrl ? new URL(currentUrl).hostname : "TAPAS Web"}</span>
+        </div>
+      </div>
+      <div className="browser-toolbar">
+        <button className="browser-nav-button" onClick={goBack} disabled={historyIndex <= 0} title="Back">←</button>
+        <button className="browser-nav-button" onClick={goForward} disabled={historyIndex >= history.length - 1} title="Forward">→</button>
+        <button className="browser-nav-button" onClick={() => currentUrl && setFrameKey((value) => value + 1)} disabled={!currentUrl} title="Reload">⟳</button>
+        <button className="browser-nav-button" onClick={() => { setCurrentUrl(""); setAddress(""); setMessage("TAPAS Web · Ready to explore"); }} title="Home">⌂</button>
+        <form className="browser-address-form" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
+          <span>⌕</span>
+          <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search or enter a website address" />
+          <button type="submit">Go</button>
+        </form>
+        <button
+          className="browser-nav-button"
+          onClick={() => currentUrl && window.open(currentUrl, "_blank", "noopener,noreferrer")}
+          disabled={!currentUrl}
+          title="Open this page in a new browser tab (use this if the page stays blank)"
+        >↗</button>
+        <span className="browser-ad-status" title="Basic privacy filtering is available in the desktop WebView">Privacy</span>
+      </div>
+
+      {currentUrl ? (
+        <div className="browser-webview-frame">
+          <iframe
+            key={frameKey}
+            src={youtubeUrl ?? currentUrl}
+            title="TAPAS Browser website"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          />
+          <div className="browser-embed-notice">
+            {isYoutube && !youtubeUrl
+              ? "YouTube home and channel pages may not work inside an embedded browser. Use the ↗ button to open them externally. Individual video links can use the supported YouTube player."
+              : "Some websites prevent embedding. If this page stays blank, use the ↗ button to open it in a new browser tab."}
+          </div>
+        </div>
+      ) : (
+        <div className="browser-home">
+          <div className="browser-home-content">
+            <div className="browser-home-logo">T</div>
+            <h1>TAPAS Browser</h1>
+            <p>{message}</p>
+            <form className="browser-home-search" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
+              <span>⌕</span>
+              <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search the web or enter a URL" />
+              <button type="submit">Search</button>
+            </form>
+            <div className="browser-shortcuts">
+              {shortcuts.map((item) => (
+                <div className="browser-shortcut" key={item.id}>
+                  <button className="browser-shortcut-open" onClick={() => navigate(item.url)} title={item.url}>
+                    <img src={faviconUrl(item.url)} alt="" />
+                    <span>{item.name}</span>
+                  </button>
+                  <button className="browser-shortcut-remove" onClick={() => setShortcuts((items) => items.filter((entry) => entry.id !== item.id))} aria-label={`Remove ${item.name}`}>×</button>
+>>>>>>> 1dde0c2 (Update TAPAS OS browser compatibility)
                 </div>
               )}
             </div>

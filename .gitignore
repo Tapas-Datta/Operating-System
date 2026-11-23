@@ -63,3 +63,5 @@ tapas-settings-source.zip
 *.pre-shortcuts-backup
 *.window-manager-backup
 *.native-*
+
+.vercel/

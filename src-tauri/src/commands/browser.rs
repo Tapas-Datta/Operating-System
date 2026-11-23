@@ -84,6 +84,7 @@ const AD_BLOCK_SCRIPT: &str = r#"
 })();
 "#;
 
+
 fn validate_label(label: &str) -> Result<(), String> {
     if !label.starts_with("browser-")
         || !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
