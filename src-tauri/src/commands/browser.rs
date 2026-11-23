@@ -1,4 +1,5 @@
 
+cat > src-tauri/src/commands/browser.rs <<'EOF'
 use tauri::{
     AppHandle,
     LogicalPosition,
@@ -7,83 +8,9 @@ use tauri::{
     WebviewUrl,
 };
 use tauri::webview::WebviewBuilder;
-use url::Url;
 use tauri::webview::DownloadEvent;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-const AD_BLOCK_SCRIPT: &str = r#"
-(() => {
-  const blocked = [
-    /doubleclick\.net/i,
-    /googlesyndication\.com/i,
-    /googleadservices\.com/i,
-    /adservice\.google\./i,
-    /googletagmanager\.com/i,
-    /amazon-adsystem\.com/i,
-    /adnxs\.com/i,
-    /taboola\.com/i,
-    /outbrain\.com/i,
-    /popads\.net/i,
-    /popcash\.net/i
-  ];
-
-  const shouldBlock = (value) => {
-    try {
-      const url = new URL(value, location.href);
-      return blocked.some(pattern => pattern.test(url.hostname));
-    } catch {
-      return false;
-    }
-  };
-
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    const url = typeof input === "string" ? input : input?.url;
-    if (url && shouldBlock(url)) {
-      return Promise.resolve(new Response("", {
-        status: 204,
-        statusText: "Blocked by TAPAS OS"
-      }));
-    }
-    return originalFetch(input, init);
-  };
-
-  const originalOpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this.__tapasBlocked = shouldBlock(url);
-    return originalOpen.call(this, method, url, ...rest);
-  };
-
-  const originalSend = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.send = function(...args) {
-    if (this.__tapasBlocked) {
-      this.abort();
-      return;
-    }
-    return originalSend.apply(this, args);
-  };
-
-  const removeAds = () => {
-    const selectors = [
-      'iframe[src*="doubleclick"]',
-      'iframe[src*="googlesyndication"]',
-      '[id^="google_ads"]',
-      '[class*="ad-container"]',
-      '[class*="advertisement"]',
-      '[data-ad-slot]'
-    ];
-    document.querySelectorAll(selectors.join(",")).forEach(el => el.remove());
-  };
-
-  new MutationObserver(removeAds).observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-
-  document.addEventListener("DOMContentLoaded", removeAds);
-})();
-"#;
-
+use url::Url;
 
 fn validate_label(label: &str) -> Result<(), String> {
     if !label.starts_with("browser-")
@@ -142,7 +69,6 @@ pub fn create_browser_view(
         label,
         WebviewUrl::External(url),
     )
-    .initialization_script(AD_BLOCK_SCRIPT)
     .on_navigation(|url| {
         matches!(url.scheme(), "http" | "https")
     })
@@ -155,7 +81,10 @@ pub fn create_browser_view(
 
             let safe_name: String = original_name
                 .chars()
-                .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'))
+                .filter(|ch| {
+                    ch.is_ascii_alphanumeric()
+                        || matches!(ch, '.' | '-' | '_')
+                })
                 .take(100)
                 .collect();
 
@@ -170,8 +99,11 @@ pub fn create_browser_view(
                 .unwrap_or_default()
                 .as_secs();
 
-            *destination = download_dir.join(format!("{timestamp}-{safe_name}"));
+            *destination = download_dir.join(
+                format!("{timestamp}-{safe_name}")
+            );
         }
+
         true
     });
 
@@ -248,7 +180,6 @@ pub fn close_browser_view(
     Ok(())
 }
 
-
 #[tauri::command]
 pub fn browser_action(
     app: AppHandle,
@@ -263,27 +194,36 @@ pub fn browser_action(
 
     match action.as_str() {
         "back" => webview.eval("history.back()"),
+
         "forward" => webview.eval("history.forward()"),
+
         "reload" => webview.reload(),
+
         "download" => webview.eval(r#"
             (() => {
-              const video = document.querySelector("video");
-              const mediaUrl = video?.currentSrc || video?.src;
+                const video = document.querySelector("video");
+                const mediaUrl = video?.currentSrc || video?.src;
 
-              if (!mediaUrl || mediaUrl.startsWith("blob:")) {
-                console.warn("This page does not expose a directly downloadable media URL.");
-                return;
-              }
+                if (!mediaUrl || mediaUrl.startsWith("blob:")) {
+                    console.warn(
+                        "This page does not expose a directly downloadable media URL."
+                    );
+                    return;
+                }
 
-              const link = document.createElement("a");
-              link.href = mediaUrl;
-              link.download = "media";
-              link.style.display = "none";
-              document.body.appendChild(link);
-              link.click();
-              link.remove();
+                const link = document.createElement("a");
+                link.href = mediaUrl;
+                link.download = "media";
+                link.style.display = "none";
+
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
             })();
         "#),
+
         _ => return Err("Unsupported browser action".into()),
-    }.map_err(|error| error.to_string())
+    }
+    .map_err(|error| error.to_string())
 }
+EOF
