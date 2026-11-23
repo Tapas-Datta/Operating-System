@@ -1,5 +1,3 @@
-
-cat > src-tauri/src/commands/browser.rs <<'EOF'
 use tauri::{
     AppHandle,
     LogicalPosition,
@@ -226,4 +224,3 @@ pub fn browser_action(
     }
     .map_err(|error| error.to_string())
 }
-EOF

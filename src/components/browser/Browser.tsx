@@ -964,6 +964,21 @@ function WebBrowser({ launchRequest }: BrowserProps) {
         {tabs.map((tab) => {
           const isActive = tab.id === activeId;
           const videoUrl = tab.url ? youtubeEmbedUrl(tab.url) : null;
+          const host = (() => {
+            try {
+              return new URL(tab.url).hostname.replace(/^www\\./, "").toLowerCase();
+            } catch {
+              return "";
+            }
+          })();
+
+          const blockedEmbed =
+            host === "google.com" ||
+            host.endsWith(".google.com") ||
+            host === "youtube.com" ||
+            host.endsWith(".youtube.com") ||
+            host === "youtu.be" ||
+            (isYouTubePage(tab.url) && !videoUrl);
 
           return (
             <div
@@ -976,15 +991,36 @@ function WebBrowser({ launchRequest }: BrowserProps) {
               }}
             >
               {tab.url ? (
-                <iframe
-                  key={`${tab.id}-${frameKeys[tab.id] || 0}`}
-                  src={videoUrl || tab.url}
-                  title={`TAPAS Browser - ${tab.title}`}
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                  allowFullScreen
-                  style={{ width: "100%", height: "100%", minHeight: 350, border: "none" }}
-                />
+                blockedEmbed ? (
+                  <div className="browser-home">
+                    <div className="browser-home-content">
+                      <div className="browser-home-logo">T</div>
+                      <h1>Open this website externally</h1>
+                      <p>
+                        This website does not allow embedded browsing.
+                        Open it in a new browser tab to continue.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(tab.url, "_blank", "noopener,noreferrer")
+                        }
+                      >
+                        Open Website ↗
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <iframe
+                    key={`${tab.id}-${frameKeys[tab.id] || 0}`}
+                    src={videoUrl || tab.url}
+                    title={`TAPAS Browser - ${tab.title}`}
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                    allowFullScreen
+                    style={{ width: "100%", height: "100%", minHeight: 350, border: "none" }}
+                  />
+                )
               ) : (
                 <div className="browser-home">
                   <div className="browser-home-content">
