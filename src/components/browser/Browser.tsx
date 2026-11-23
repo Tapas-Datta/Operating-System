@@ -746,16 +746,12 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   const [showAddShortcut, setShowAddShortcut] = useState(false);
   const [shortcutName, setShortcutName] = useState("");
   const [shortcutUrl, setShortcutUrl] = useState("");
-  const [frameKey, setFrameKey] = useState(0);
+  const [frameKeys, setFrameKeys] = useState<Record<number, number>>({});
 
   const activeTab = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
   const currentUrl = activeTab?.url ?? "";
   const youtubePlayerUrl = currentUrl ? youtubeEmbedUrl(currentUrl) : null;
   const youtubePage = currentUrl ? isYouTubePage(currentUrl) : false;
-  const currentHost = (() => {
-    try { return currentUrl ? new URL(currentUrl).hostname : "New Tab"; }
-    catch { return "New Tab"; }
-  })();
 
   useEffect(() => {
     if (launchRequest?.url) navigate(launchRequest.url);
@@ -767,53 +763,77 @@ function WebBrowser({ launchRequest }: BrowserProps) {
 
   useEffect(() => {
     setAddress(currentUrl);
-  }, [activeId]);
+  }, [activeId, currentUrl]);
 
-  const updateActiveTab = (updater: (tab: WebBrowserTab) => WebBrowserTab) => {
-    setTabs((previous) => previous.map((tab) => tab.id === activeId ? updater(tab) : tab));
+  const updateTab = (
+    id: number,
+    updater: (tab: WebBrowserTab) => WebBrowserTab
+  ) => {
+    setTabs((previous) =>
+      previous.map((tab) => tab.id === id ? updater(tab) : tab)
+    );
   };
 
   const navigate = (value: string) => {
     const url = resolveAddress(value);
     if (!url || !/^https?:\/\//i.test(url)) {
-      setMessage("Enter a valid HTTP or HTTPS website address.");
+      setMessage("Enter a valid HTTP or HTTPS address.");
       return;
     }
-    const title = (() => { try { return new URL(url).hostname; } catch { return "Website"; } })();
-    updateActiveTab((tab) => ({
+
+    let title = "Website";
+    try {
+      title = new URL(url).hostname;
+    } catch {
+      // Keep the fallback title.
+    }
+
+    updateTab(activeId, (tab) => ({
       ...tab,
       title,
       url,
       history: [...tab.history.slice(0, tab.historyIndex + 1), url].slice(-50),
       historyIndex: Math.min(tab.historyIndex + 1, 49),
     }));
+
     setAddress(url);
-    setFrameKey((previous) => previous + 1);
-    setMessage(`Trying to open ${title} inside TAPAS Browser.`);
+    setMessage(`Loading ${title}...`);
   };
 
   const createTab = () => {
-    const id = Date.now();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
     setTabs((previous) => [...previous, {
-      id, title: "New Tab", url: "", history: [], historyIndex: -1,
+      id,
+      title: "New Tab",
+      url: "",
+      history: [],
+      historyIndex: -1,
     }]);
     setActiveId(id);
     setAddress("");
     setMessage("New tab · Ready to explore");
-    setFrameKey((previous) => previous + 1);
   };
 
   const closeTab = (id: number) => {
     if (tabs.length === 1) {
       const newId = Date.now();
-      setTabs([{ id: newId, title: "New Tab", url: "", history: [], historyIndex: -1 }]);
+      setTabs([{
+        id: newId,
+        title: "New Tab",
+        url: "",
+        history: [],
+        historyIndex: -1,
+      }]);
       setActiveId(newId);
       setAddress("");
+      setMessage("New tab · Ready to explore");
       return;
     }
+
     const index = tabs.findIndex((tab) => tab.id === id);
     const remaining = tabs.filter((tab) => tab.id !== id);
     setTabs(remaining);
+
     if (activeId === id) {
       const next = remaining[Math.max(0, index - 1)];
       setActiveId(next.id);
@@ -825,18 +845,37 @@ function WebBrowser({ launchRequest }: BrowserProps) {
     if (!activeTab || activeTab.historyIndex <= 0) return;
     const nextIndex = activeTab.historyIndex - 1;
     const url = activeTab.history[nextIndex];
-    updateActiveTab((tab) => ({ ...tab, historyIndex: nextIndex, url }));
+    updateTab(activeId, (tab) => ({ ...tab, historyIndex: nextIndex, url }));
     setAddress(url);
-    setFrameKey((previous) => previous + 1);
   };
 
   const goForward = () => {
     if (!activeTab || activeTab.historyIndex >= activeTab.history.length - 1) return;
     const nextIndex = activeTab.historyIndex + 1;
     const url = activeTab.history[nextIndex];
-    updateActiveTab((tab) => ({ ...tab, historyIndex: nextIndex, url }));
+    updateTab(activeId, (tab) => ({ ...tab, historyIndex: nextIndex, url }));
     setAddress(url);
-    setFrameKey((previous) => previous + 1);
+  };
+
+  const reloadPage = () => {
+    if (!currentUrl) return;
+    setFrameKeys((previous) => ({
+      ...previous,
+      [activeId]: (previous[activeId] || 0) + 1,
+    }));
+    setMessage("Reloading page...");
+  };
+
+  const goHome = () => {
+    updateTab(activeId, (tab) => ({
+      ...tab,
+      title: "New Tab",
+      url: "",
+      history: [],
+      historyIndex: -1,
+    }));
+    setAddress("");
+    setMessage("TAPAS Web · Ready to explore");
   };
 
   const addShortcut = (event: React.FormEvent) => {
@@ -844,9 +883,11 @@ function WebBrowser({ launchRequest }: BrowserProps) {
     const name = shortcutName.trim();
     const url = resolveAddress(shortcutUrl);
     if (!name || !url || !/^https?:\/\//i.test(url)) return;
+
     setShortcuts((previous) => [...previous, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: name.slice(0, 24), url,
+      name: name.slice(0, 24),
+      url,
     }]);
     setShortcutName("");
     setShortcutUrl("");
@@ -856,7 +897,7 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   const openOutside = () => {
     if (!currentUrl) return;
     window.open(currentUrl, "_blank", "noopener,noreferrer");
-    setMessage(`Opened ${currentHost} in a separate browser tab because the site blocks embedding.`);
+    setMessage("This website blocks embedded browsing. Opened in your system browser if permitted.");
   };
 
   return (
@@ -869,89 +910,160 @@ function WebBrowser({ launchRequest }: BrowserProps) {
             onClick={() => setActiveId(tab.id)}
             role="button"
             tabIndex={0}
-            onKeyDown={(event) => { if (event.key === "Enter") setActiveId(tab.id); }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") setActiveId(tab.id);
+            }}
           >
             <span>🌐</span>
             <span className="browser-tab-title">{tab.title}</span>
             <button
               type="button"
-              aria-label="Close tab"
-              onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }}
+              aria-label={`Close ${tab.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                closeTab(tab.id);
+              }}
             >×</button>
           </div>
         ))}
-        <button type="button" className="browser-new-tab" onClick={createTab} title="New tab">+</button>
+        <button
+          type="button"
+          className="browser-new-tab"
+          onClick={createTab}
+          title="New tab"
+          aria-label="New tab"
+        >+</button>
       </div>
 
       <div className="browser-toolbar">
-        <button className="browser-nav-button" onClick={goBack} disabled={!activeTab || activeTab.historyIndex <= 0} title="Back">←</button>
-        <button className="browser-nav-button" onClick={goForward} disabled={!activeTab || activeTab.historyIndex >= activeTab.history.length - 1} title="Forward">→</button>
-        <button className="browser-nav-button" onClick={() => currentUrl && setFrameKey((value) => value + 1)} disabled={!currentUrl} title="Reload">⟳</button>
-        <button className="browser-nav-button" onClick={() => { updateActiveTab((tab) => ({ ...tab, title: "New Tab", url: "", history: [], historyIndex: -1 })); setAddress(""); setMessage("TAPAS Web · Ready to explore"); }} title="Home">⌂</button>
-        <form className="browser-address-form" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
+        <button className="browser-nav-button" onClick={goBack}
+          disabled={!activeTab || activeTab.historyIndex <= 0} title="Back">←</button>
+        <button className="browser-nav-button" onClick={goForward}
+          disabled={!activeTab || activeTab.historyIndex >= activeTab.history.length - 1}
+          title="Forward">→</button>
+        <button className="browser-nav-button" onClick={reloadPage}
+          disabled={!currentUrl} title="Reload">⟳</button>
+        <button className="browser-nav-button" onClick={goHome} title="Home">⌂</button>
+
+        <form className="browser-address-form" onSubmit={(event) => {
+          event.preventDefault();
+          navigate(address);
+        }}>
           <span>⌕</span>
-          <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search or enter a website address" />
+          <input
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            placeholder="Search or enter a website address"
+          />
           <button type="submit">Go</button>
         </form>
         <span className="browser-ad-status" title="Privacy">Privacy</span>
       </div>
 
-      {currentUrl ? (
-        <div className="browser-webview-frame">
-          <iframe
-            key={`${activeId}-${frameKey}`}
-            src={youtubePlayerUrl || currentUrl}
-            title={youtubePlayerUrl ? "YouTube video player" : "TAPAS Browser website"}
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-          />
-          <div className="browser-embed-notice">
-            {youtubePlayerUrl
-              ? "YouTube video player · Open another tab with + to keep this video available."
-              : youtubePage
-                ? "YouTube pages may block embedding. Open a direct video URL to use the supported player, or open this page in a separate browser tab."
-                : "If this website refuses to connect, it may block embedded browsing. You can open it in a separate browser tab."}
-            <button type="button" onClick={openOutside}>Open in browser tab ↗</button>
-          </div>
-        </div>
-      ) : (
-        <div className="browser-home">
-          <div className="browser-home-content">
-            <div className="browser-home-logo">T</div>
-            <h1>TAPAS Browser</h1>
-            <p>{message}</p>
-            <form className="browser-home-search" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
-              <span>⌕</span>
-              <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search the web or enter a URL" />
-              <button type="submit">Search</button>
-            </form>
-            <div className="browser-shortcuts">
-              {shortcuts.map((item) => (
-                <div className="browser-shortcut" key={item.id}>
-                  <button className="browser-shortcut-open" onClick={() => navigate(item.url)} title={item.url}>
-                    <img src={faviconUrl(item.url)} alt="" />
-                    <span>{item.name}</span>
-                  </button>
-                  <button className="browser-shortcut-remove" onClick={() => setShortcuts((items) => items.filter((entry) => entry.id !== item.id))} aria-label={`Remove ${item.name}`}>×</button>
+      <div className="browser-webview-frame" style={{ position: "relative", minHeight: 350 }}>
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeId;
+          const videoUrl = tab.url ? youtubeEmbedUrl(tab.url) : null;
+
+          return (
+            <div
+              key={tab.id}
+              style={{
+                display: isActive ? "block" : "none",
+                width: "100%",
+                height: "100%",
+                minHeight: 350,
+              }}
+            >
+              {tab.url ? (
+                <iframe
+                  key={`${tab.id}-${frameKeys[tab.id] || 0}`}
+                  src={videoUrl || tab.url}
+                  title={`TAPAS Browser - ${tab.title}`}
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                  style={{ width: "100%", height: "100%", minHeight: 350, border: "none" }}
+                />
+              ) : (
+                <div className="browser-home">
+                  <div className="browser-home-content">
+                    <div className="browser-home-logo">T</div>
+                    <h1>TAPAS Browser</h1>
+                    <p>Your personal space to explore the internet.</p>
+
+                    <form className="browser-home-search" onSubmit={(event) => {
+                      event.preventDefault();
+                      navigate(address);
+                    }}>
+                      <span>⌕</span>
+                      <input
+                        value={isActive ? address : ""}
+                        onChange={(event) => setAddress(event.target.value)}
+                        placeholder="Search the web or enter a URL"
+                      />
+                      <button type="submit">Search</button>
+                    </form>
+
+                    <div className="browser-shortcuts">
+                      {shortcuts.map((item) => (
+                        <div className="browser-shortcut" key={item.id}>
+                          <button className="browser-shortcut-open"
+                            onClick={() => navigate(item.url)} title={item.url}>
+                            <img src={faviconUrl(item.url)} alt="" />
+                            <span>{item.name}</span>
+                          </button>
+                          <button className="browser-shortcut-remove"
+                            onClick={() => setShortcuts((previous) =>
+                              previous.filter((entry) => entry.id !== item.id)
+                            )}
+                            aria-label={`Remove ${item.name}`}>×</button>
+                        </div>
+                      ))}
+                      <button className="browser-shortcut-add"
+                        onClick={() => setShowAddShortcut((value) => !value)}>
+                        <span>＋</span><span>Add shortcut</span>
+                      </button>
+                    </div>
+
+                    {showAddShortcut && isActive && (
+                      <form className="browser-shortcut-form" onSubmit={addShortcut}>
+                        <input value={shortcutName}
+                          onChange={(event) => setShortcutName(event.target.value)}
+                          placeholder="Website name" required />
+                        <input value={shortcutUrl}
+                          onChange={(event) => setShortcutUrl(event.target.value)}
+                          placeholder="https://example.com" required />
+                        <button type="submit">Save</button>
+                        <button type="button" onClick={() => setShowAddShortcut(false)}>
+                          Cancel
+                        </button>
+                      </form>
+                    )}
+
+                    <small className="browser-web-note">
+                      Some websites block iframe embedding. The TAPAS OS desktop
+                      app uses a native WebView for broader website compatibility.
+                    </small>
+                  </div>
                 </div>
-              ))}
-              <button className="browser-shortcut-add" onClick={() => setShowAddShortcut((value) => !value)}>
-                <span>＋</span><span>Add shortcut</span>
-              </button>
+              )}
             </div>
-            {showAddShortcut && (
-              <form className="browser-shortcut-form" onSubmit={addShortcut}>
-                <input value={shortcutName} onChange={(event) => setShortcutName(event.target.value)} placeholder="Website name" required />
-                <input value={shortcutUrl} onChange={(event) => setShortcutUrl(event.target.value)} placeholder="https://example.com" required />
-                <button type="submit">Save</button>
-                <button type="button" onClick={() => setShowAddShortcut(false)}>Cancel</button>
-              </form>
-            )}
-            <small className="browser-web-note">Some websites block embedded browsing. Use the TAPAS OS desktop app for broader native WebView compatibility.</small>
-          </div>
+          );
+        })}
+      </div>
+
+      {currentUrl && (
+        <div className="browser-embed-notice">
+          {youtubePlayerUrl
+            ? "YouTube video player · Use + to open another tab."
+            : youtubePage
+              ? "YouTube homepage and search pages may block iframe embedding."
+              : "Some websites prevent embedded browsing."}
+          <button type="button" onClick={openOutside}>Open in browser tab ↗</button>
         </div>
       )}
+
       <div className="browser-status">{message}</div>
     </div>
   );
