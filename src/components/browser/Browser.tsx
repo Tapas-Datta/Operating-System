@@ -64,6 +64,41 @@ function faviconUrl(url: string) {
   }
 }
 
+// YouTube pages cannot be embedded as ordinary webpages. Individual videos
+// can be displayed using YouTube's supported embed player.
+function youtubeEmbedUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    let videoId = "";
+
+    if (host === "youtu.be") {
+      videoId = url.pathname.split("/").filter(Boolean)[0] || "";
+    } else if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      if (url.pathname === "/watch") videoId = url.searchParams.get("v") || "";
+      else if (/^\/(shorts|live|embed)\//.test(url.pathname)) {
+        videoId = url.pathname.split("/").filter(Boolean)[1] || "";
+      }
+    }
+
+    return /^[a-zA-Z0-9_-]{11}$/.test(videoId)
+      ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isYouTubePage(value: string): boolean {
+  try {
+    const host = new URL(value).hostname.replace(/^www\\./, "").toLowerCase();
+    return host === "youtube.com" || host === "m.youtube.com" ||
+      host === "music.youtube.com" || host === "youtu.be";
+  } catch {
+    return false;
+  }
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -703,6 +738,8 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [frameKey, setFrameKey] = useState(0);
+  const youtubePlayerUrl = currentUrl ? youtubeEmbedUrl(currentUrl) : null;
+  const youtubePage = currentUrl ? isYouTubePage(currentUrl) : false;
 
   useEffect(() => {
     if (launchRequest?.url) navigate(launchRequest.url);
@@ -776,12 +813,6 @@ function WebBrowser({ launchRequest }: BrowserProps) {
           <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search or enter a website address" />
           <button type="submit">Go</button>
         </form>
-        <button
-          className="browser-nav-button"
-          onClick={() => currentUrl && window.open(currentUrl, "_blank", "noopener,noreferrer")}
-          disabled={!currentUrl}
-          title="Open this page in a new browser tab (use this if the page stays blank)"
-        >↗</button>
         <span className="browser-ad-status" title="Basic privacy filtering is available in the desktop WebView">Privacy</span>
       </div>
 
@@ -789,14 +820,18 @@ function WebBrowser({ launchRequest }: BrowserProps) {
         <div className="browser-webview-frame">
           <iframe
             key={frameKey}
-            src={currentUrl}
-            title="TAPAS Browser website"
+            src={youtubePlayerUrl || currentUrl}
+            title={youtubePlayerUrl ? "YouTube video player" : "TAPAS Browser website"}
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
           />
           <div className="browser-embed-notice">
-            Some websites prevent embedding. If this page stays blank, the website does not permit display inside another site. Use the ↗ button in the toolbar to open it in a new browser tab.
+            {youtubePlayerUrl
+              ? "Playing this YouTube video inside TAPAS Browser."
+              : youtubePage
+                ? "YouTube blocks its homepage and search-results pages from being embedded in a website. Individual video links can play here. Full YouTube browsing is available in the TAPAS OS desktop app."
+                : "Some websites prevent embedding. This website may not permit display inside TAPAS Browser."}
           </div>
         </div>
       ) : (
