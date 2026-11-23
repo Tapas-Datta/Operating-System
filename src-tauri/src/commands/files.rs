@@ -18,7 +18,9 @@ pub struct FileEntry {
 
 // Get the user's Home directory.
 fn home_directory() -> Result<PathBuf, String> {
+    // HOME on macOS/Linux, USERPROFILE on Windows.
     let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
         .ok_or_else(|| "Home directory not found".to_string())?;
 
     fs::canonicalize(PathBuf::from(home))
@@ -344,6 +346,11 @@ pub struct StorageInfo {
 
 #[tauri::command]
 pub fn get_storage_info() -> Result<StorageInfo, String> {
+    // `df` is not available on Windows; the UI handles this error gracefully.
+    if cfg!(windows) {
+        return Err("Storage information is not available on Windows yet".to_string());
+    }
+
     let home = home_directory()?;
     let output = std::process::Command::new("df")
         .arg("-k")

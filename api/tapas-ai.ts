@@ -1,4 +1,4 @@
-type AgentAction = { type: "list_directory" | "create_folder" | "create_file" | "open_folder"; path?: string };
+type AgentAction = { type: "list_directory" | "create_folder" | "create_file" | "open_folder" | "open_app"; path?: string; app?: string };
 type AgentReply = { message: string; actions: AgentAction[] };
 
 type RequestLike = { method?: string; body?: unknown; headers?: Record<string, string | string[] | undefined>; socket?: { remoteAddress?: string } };
@@ -9,6 +9,7 @@ type ResponseLike = {
 };
 
 const allowedTypes = new Set(["list_directory", "create_folder", "create_file", "open_folder"]);
+const allowedApps = new Set(["My Files", "Browser", "Settings", "App Store", "Terminal"]);
 const requestBuckets = new Map<string, { startedAt: number; count: number }>();
 function isRateLimited(req: RequestLike) {
   const forwarded = req.headers?.["x-forwarded-for"];
@@ -46,7 +47,11 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
   const context = typeof body.context === "string" ? body.context.slice(0, 2000) : "";
   if (!prompt || prompt.length > 6000) return res.status(400).json({ error: "Enter a message under 6,000 characters." });
 
-  const system = `You are TAPAS AI for the TAPAS OS WEB DEMO. Return ONLY JSON: {"message":"...","actions":[]}. Allowed actions: {"type":"list_directory","path":"relative path inside TAPAS Workspace; empty means workspace root"}, {"type":"create_folder","path":"relative path inside TAPAS Workspace"}, {"type":"create_file","path":"relative path inside TAPAS Workspace"}, {"type":"open_folder","path":"relative path inside TAPAS Workspace"}. Never suggest shell commands, arbitrary code, deleting, moving, reading file contents, network downloads, payments, passwords, opening native apps, or actions outside this allowlist. Never claim an action completed before the app executes it. File creation requires user approval. Do not claim access to the user's computer filesystem. If unsupported, return actions:[].`;
+  // The installed desktop app calls this same endpoint (so no API key ships inside it).
+  const isDesktop = body.client === "desktop";
+  const desktopSystem = `You are TAPAS AI, a desktop assistant. Return ONLY JSON: {"message":"...","actions":[...]}. Allowed action objects: {"type":"list_directory","path":"relative path under Home; empty means Home"}; {"type":"create_folder","path":"relative path under Home"}; {"type":"create_file","path":"relative path under Home"}; {"type":"open_folder","path":"relative folder path under Home; empty means Home"}; {"type":"open_app","app":"My Files|Browser|Settings|App Store|Terminal"}. Never suggest shell commands, arbitrary code, deleting, moving, reading file contents, network downloads, payments, passwords, or actions outside this allowlist. For create actions explain what will be created; app will ask confirmation. If unsupported, return actions:[]. Never claim completion before execution. Do not mention Sicily AI.`;
+  const webSystem = `You are TAPAS AI for the TAPAS OS WEB DEMO. Return ONLY JSON: {"message":"...","actions":[]}. Allowed actions: {"type":"list_directory","path":"relative path inside TAPAS Workspace; empty means workspace root"}, {"type":"create_folder","path":"relative path inside TAPAS Workspace"}, {"type":"create_file","path":"relative path inside TAPAS Workspace"}, {"type":"open_folder","path":"relative path inside TAPAS Workspace"}. Never suggest shell commands, arbitrary code, deleting, moving, reading file contents, network downloads, payments, passwords, opening native apps, or actions outside this allowlist. Never claim an action completed before the app executes it. File creation requires user approval. Do not claim access to the user's computer filesystem. If unsupported, return actions:[].`;
+  const system = isDesktop ? desktopSystem : webSystem;
 
   try {
     const upstream = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -76,7 +81,16 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     }
     const actions: AgentAction[] = [];
     for (const raw of parsed.actions) {
-      if (!raw || typeof raw !== "object" || !allowedTypes.has(String((raw as AgentAction).type))) {
+      const rawType = raw && typeof raw === "object" ? String((raw as AgentAction).type) : "";
+      if (isDesktop && rawType === "open_app") {
+        const appName = String((raw as AgentAction).app ?? "");
+        if (!allowedApps.has(appName)) {
+          return res.status(502).json({ error: "TAPAS AI requested an app that is not allowed; it was blocked." });
+        }
+        actions.push({ type: "open_app", app: appName });
+        continue;
+      }
+      if (!raw || typeof raw !== "object" || !allowedTypes.has(rawType)) {
         return res.status(502).json({ error: "TAPAS AI returned an unsupported action; it was blocked." });
       }
       const action = raw as AgentAction;

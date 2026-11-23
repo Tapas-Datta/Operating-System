@@ -75,15 +75,21 @@ type BrowserProps = {
   launchRequest?: {
     id: number;
     url: string;
+    title?: string;
   } | null;
+  // When false the native browser view is hidden (it is drawn above all HTML,
+  // so it must not cover other windows, menus or panels).
+  visible?: boolean;
 };
 
-function DesktopBrowser({ launchRequest }: BrowserProps) {
+function DesktopBrowser({ launchRequest, visible = true }: BrowserProps) {
   const pageRef = useRef<HTMLDivElement>(null);
   const createdViews = useRef(new Set<number>());
   const creatingViews = useRef(new Set<number>());
   const tabsRef = useRef<BrowserTab[]>([]);
   const activeIdRef = useRef(1);
+  const visibleRef = useRef(true);
+  const allHiddenRef = useRef(false);
 
   const [tabs, setTabs] = useState<BrowserTab[]>([
     { id: 1, title: "New Tab", url: HOME_URL },
@@ -114,19 +120,20 @@ function DesktopBrowser({ launchRequest }: BrowserProps) {
       ...previous,
       {
         id,
-        title: "Sicily AI",
+        title: launchRequest.title || "New Tab",
         url: launchRequest.url,
       },
     ]);
 
     setActiveId(id);
     setAddress(launchRequest.url);
-    setMessage("Opening Sicily AI...");
+    setMessage(`Opening ${launchRequest.title || "website"}...`);
   }, [launchRequest?.id]);
 
   tabsRef.current = tabs;
   activeIdRef.current = activeId;
   showDownloadsRef.current = showDownloads;
+  visibleRef.current = visible;
 
   const activeTab = tabs.find((tab) => tab.id === activeId);
   const activeUrl = activeTab?.url ?? HOME_URL;
@@ -166,10 +173,15 @@ function DesktopBrowser({ launchRequest }: BrowserProps) {
     const currentId = activeIdRef.current;
     const currentTab = tabsRef.current.find((tab) => tab.id === currentId);
 
-    if (showDownloadsRef.current) {
-      for (const id of createdViews.current) await hideView(id);
+    if (showDownloadsRef.current || !visibleRef.current) {
+      // Hide once, not on every polling tick.
+      if (!allHiddenRef.current) {
+        allHiddenRef.current = true;
+        for (const id of createdViews.current) await hideView(id);
+      }
       return;
     }
+    allHiddenRef.current = false;
 
     for (const id of createdViews.current) {
       if (id !== currentId || currentTab?.url === HOME_URL) {
@@ -268,11 +280,14 @@ function DesktopBrowser({ launchRequest }: BrowserProps) {
     let cancelled = false;
 
     const activate = async () => {
-      for (const id of createdViews.current) {
-        if (id !== activeId || showDownloads) await hideView(id);
+      if (showDownloads || !visible) {
+        await positionActiveView();
+        return;
       }
 
-      if (showDownloads) return;
+      for (const id of createdViews.current) {
+        if (id !== activeId) await hideView(id);
+      }
 
       if (activeUrl === HOME_URL) {
         setMessage("Guest mode · Ready to explore");
@@ -316,7 +331,7 @@ function DesktopBrowser({ launchRequest }: BrowserProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeId, activeUrl, showDownloads]);
+  }, [activeId, activeUrl, showDownloads, visible]);
 
   // Keep native webviews aligned with the visible browser page.
   useEffect(() => {
@@ -677,7 +692,8 @@ function DesktopBrowser({ launchRequest }: BrowserProps) {
 
 function WebBrowser({ launchRequest }: BrowserProps) {
   const [address, setAddress] = useState("");
-  const [message, setMessage] = useState("Web demo · Websites open in a new browser tab");
+  const [currentUrl, setCurrentUrl] = useState("");
+  const [message, setMessage] = useState("TAPAS Web · Ready to explore");
   const [shortcuts, setShortcuts] = useState<Shortcut[]>(
     () => readStorage("tapas-browser-shortcuts", DEFAULT_SHORTCUTS)
   );
@@ -685,27 +701,47 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   const [shortcutName, setShortcutName] = useState("");
   const [shortcutUrl, setShortcutUrl] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [frameKey, setFrameKey] = useState(0);
 
   useEffect(() => {
-    if (launchRequest?.url) setAddress(launchRequest.url);
+    if (launchRequest?.url) navigate(launchRequest.url);
   }, [launchRequest?.id]);
 
   useEffect(() => {
     localStorage.setItem("tapas-browser-shortcuts", JSON.stringify(shortcuts));
   }, [shortcuts]);
 
-  const openWebsite = (value: string) => {
+  const navigate = (value: string) => {
     const url = resolveAddress(value);
-    if (!url || !/^https?:\/\//i.test(url)) return;
-    const opened = window.open(url, "_blank");
-    if (!opened) {
-      setMessage("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
+    if (!url || !/^https?:\/\//i.test(url)) {
+      setMessage("Enter a valid HTTP or HTTPS website address.");
       return;
     }
-    opened.opener = null;
-    setHistory(previous => [url, ...previous.filter(item => item !== url)].slice(0, 20));
+    setCurrentUrl(url);
     setAddress(url);
-    setMessage(`Opened ${url} in a new browser tab.`);
+    setHistory((previous) => [...previous.slice(0, historyIndex + 1), url].slice(-50));
+    setHistoryIndex((previous) => Math.min(previous + 1, 49));
+    setFrameKey((previous) => previous + 1);
+    setMessage(`Trying to open ${new URL(url).hostname} inside TAPAS Browser.`);
+  };
+
+  const goBack = () => {
+    if (historyIndex <= 0) return;
+    const next = historyIndex - 1;
+    setHistoryIndex(next);
+    setCurrentUrl(history[next]);
+    setAddress(history[next]);
+    setFrameKey((previous) => previous + 1);
+  };
+
+  const goForward = () => {
+    if (historyIndex >= history.length - 1) return;
+    const next = historyIndex + 1;
+    setHistoryIndex(next);
+    setCurrentUrl(history[next]);
+    setAddress(history[next]);
+    setFrameKey((previous) => previous + 1);
   };
 
   const addShortcut = (event: React.FormEvent) => {
@@ -713,7 +749,7 @@ function WebBrowser({ launchRequest }: BrowserProps) {
     const name = shortcutName.trim();
     const url = resolveAddress(shortcutUrl);
     if (!name || !url || !/^https?:\/\//i.test(url)) return;
-    setShortcuts(previous => [...previous, {
+    setShortcuts((previous) => [...previous, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: name.slice(0, 24), url,
     }]);
@@ -723,47 +759,90 @@ function WebBrowser({ launchRequest }: BrowserProps) {
   };
 
   return (
-    <div className="browser-shell">
+    <div className="browser-shell browser-web-mode">
       <div className="browser-tabs">
-        <div className="browser-tab active"><span>🌐</span><span className="browser-tab-title">TAPAS Web</span></div>
-      </div>
-      <div className="browser-toolbar">
-        <button className="browser-nav-button" onClick={() => setMessage("Use your browser's Back button to return from external websites.")} title="Back">←</button>
-        <button className="browser-nav-button" onClick={() => setMessage("External pages are managed by your browser.")} title="Forward">→</button>
-        <button className="browser-nav-button" onClick={() => openWebsite(address)} title="Open again">⟳</button>
-        <button onClick={() => { setAddress(""); setMessage("Web demo · Ready to explore"); }} title="Home">⌂</button>
-        <form className="browser-address-form" onSubmit={event => { event.preventDefault(); openWebsite(address); }}>
-          <span>⌕</span>
-          <input value={address} onChange={event => setAddress(event.target.value)} placeholder="Search or enter a website address" />
-          <button type="submit">Open</button>
-        </form>
-      </div>
-      <div className="browser-home">
-        <div className="browser-home-content">
-          <div className="browser-home-logo">T</div>
-          <h1>TAPAS Browser</h1>
-          <p>{message}</p>
-          <div className="browser-shortcuts">
-            {shortcuts.map(item => (
-              <button className="browser-shortcut" key={item.id} onClick={() => openWebsite(item.url)}>
-                <img src={faviconUrl(item.url)} alt="" />
-                <span>{item.name}</span>
-              </button>
-            ))}
-            <button className="browser-shortcut" onClick={() => setShowAddShortcut(true)}><span>＋</span><span>Add shortcut</span></button>
-          </div>
-          {showAddShortcut && (
-            <form className="browser-shortcut-form" onSubmit={addShortcut}>
-              <input value={shortcutName} onChange={event => setShortcutName(event.target.value)} placeholder="Name" required />
-              <input value={shortcutUrl} onChange={event => setShortcutUrl(event.target.value)} placeholder="https://example.com" required />
-              <button type="submit">Save</button>
-              <button type="button" onClick={() => setShowAddShortcut(false)}>Cancel</button>
-            </form>
-          )}
-          {history.length > 0 && <div className="browser-web-history"><strong>Recently opened</strong>{history.slice(0, 5).map(url => <button key={url} onClick={() => openWebsite(url)}>{url}</button>)}</div>}
-          <small className="browser-web-note">For security and compatibility, the Web demo opens websites in your browser instead of embedding them inside TAPAS OS. The installed Desktop app retains its native browser window.</small>
+        <div className="browser-tab active">
+          <span>🌐</span>
+          <span className="browser-tab-title">{currentUrl ? new URL(currentUrl).hostname : "TAPAS Web"}</span>
         </div>
       </div>
+      <div className="browser-toolbar">
+        <button className="browser-nav-button" onClick={goBack} disabled={historyIndex <= 0} title="Back">←</button>
+        <button className="browser-nav-button" onClick={goForward} disabled={historyIndex >= history.length - 1} title="Forward">→</button>
+        <button className="browser-nav-button" onClick={() => currentUrl && setFrameKey((value) => value + 1)} disabled={!currentUrl} title="Reload">⟳</button>
+        <button className="browser-nav-button" onClick={() => { setCurrentUrl(""); setAddress(""); setMessage("TAPAS Web · Ready to explore"); }} title="Home">⌂</button>
+        <form className="browser-address-form" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
+          <span>⌕</span>
+          <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search or enter a website address" />
+          <button type="submit">Go</button>
+        </form>
+        <button
+          className="browser-nav-button"
+          onClick={() => currentUrl && window.open(currentUrl, "_blank", "noopener,noreferrer")}
+          disabled={!currentUrl}
+          title="Open this page in a new browser tab (use this if the page stays blank)"
+        >↗</button>
+        <span className="browser-ad-status" title="Basic privacy filtering is available in the desktop WebView">Privacy</span>
+      </div>
+
+      {currentUrl ? (
+        <div className="browser-webview-frame">
+          <iframe
+            key={frameKey}
+            src={currentUrl}
+            title="TAPAS Browser website"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          />
+          <div className="browser-embed-notice">
+            Some websites prevent embedding. If this page stays blank, the website does not permit display inside another site. Use the ↗ button in the toolbar to open it in a new browser tab.
+          </div>
+        </div>
+      ) : (
+        <div className="browser-home">
+          <div className="browser-home-content">
+            <div className="browser-home-logo">T</div>
+            <h1>TAPAS Browser</h1>
+            <p>{message}</p>
+            <form className="browser-home-search" onSubmit={(event) => { event.preventDefault(); navigate(address); }}>
+              <span>⌕</span>
+              <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search the web or enter a URL" />
+              <button type="submit">Search</button>
+            </form>
+            <div className="browser-shortcuts">
+              {shortcuts.map((item) => (
+                <div className="browser-shortcut" key={item.id}>
+                  <button className="browser-shortcut-open" onClick={() => navigate(item.url)} title={item.url}>
+                    <img src={faviconUrl(item.url)} alt="" />
+                    <span>{item.name}</span>
+                  </button>
+                  <button className="browser-shortcut-remove" onClick={() => setShortcuts((items) => items.filter((entry) => entry.id !== item.id))} aria-label={`Remove ${item.name}`}>×</button>
+                </div>
+              ))}
+              <button className="browser-shortcut-add" onClick={() => setShowAddShortcut((value) => !value)}>
+                <span>＋</span><span>Add shortcut</span>
+              </button>
+            </div>
+            {showAddShortcut && (
+              <form className="browser-shortcut-form" onSubmit={addShortcut}>
+                <input value={shortcutName} onChange={(event) => setShortcutName(event.target.value)} placeholder="Website name" required />
+                <input value={shortcutUrl} onChange={(event) => setShortcutUrl(event.target.value)} placeholder="https://example.com" required />
+                <button type="submit">Save</button>
+                <button type="button" onClick={() => setShowAddShortcut(false)}>Cancel</button>
+              </form>
+            )}
+            {history.length > 0 && (
+              <div className="browser-web-history">
+                <strong>Recently opened</strong>
+                {history.slice().reverse().slice(0, 5).map((url) => <button key={url} onClick={() => navigate(url)}>{url}</button>)}
+              </div>
+            )}
+            <small className="browser-web-note">Web browsers restrict embedding of many websites. Pages that prohibit framing may not load here. For unrestricted website browsing, use the TAPAS OS Desktop app with its native WebView.</small>
+          </div>
+        </div>
+      )}
+      <div className="browser-status">{message}</div>
     </div>
   );
 }

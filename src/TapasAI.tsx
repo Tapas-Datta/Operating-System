@@ -33,7 +33,9 @@ export default function TapasAI({
   ]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
-  const [pendingAction, setPendingAction] = useState<Action | null>(null);
+  // Approval queue: every create action proposed by the AI waits here, one at a time.
+  const [queue, setQueue] = useState<Action[]>([]);
+  const pendingAction: Action | null = queue[0] ?? null;
 
   const send = async () => {
     const request = prompt.trim();
@@ -55,6 +57,8 @@ export default function TapasAI({
       if (plan.message) {
         setMessages(m => [...m, { role: "assistant", text: plan.message }]);
       }
+
+      const toApprove: Action[] = [];
 
       for (const action of plan.actions || []) {
         if (action.type === "open_app") {
@@ -114,13 +118,20 @@ export default function TapasAI({
             continue;
           }
 
-          setPendingAction(action);
-          setStatus("Awaiting your approval");
-          return;
+          toApprove.push(action);
         }
       }
 
-      setStatus("Ready");
+      if (toApprove.length > 0) {
+        setQueue(toApprove);
+        setStatus(
+          toApprove.length > 1
+            ? `Awaiting your approval (${toApprove.length} changes)`
+            : "Awaiting your approval"
+        );
+      } else {
+        setStatus("Ready");
+      }
     } catch (error) {
       setStatus("Action failed");
       setMessages(m => [...m, {
@@ -150,8 +161,8 @@ export default function TapasAI({
         text: `Success! ${path} was created.`
       }]);
 
-      setPendingAction(null);
-      setStatus("Ready");
+      setQueue(q => q.slice(1));
+      setStatus(queue.length > 1 ? "Awaiting your approval" : "Ready");
     } catch (error) {
       setMessages(m => [...m, {
         role: "assistant",
@@ -171,8 +182,8 @@ export default function TapasAI({
       text: `Cancelled: ${pendingAction.path}`
     }]);
 
-    setPendingAction(null);
-    setStatus("Ready");
+    setQueue(q => q.slice(1));
+    setStatus(queue.length > 1 ? "Awaiting your approval" : "Ready");
   };
 
   const displayPath = pendingAction?.path

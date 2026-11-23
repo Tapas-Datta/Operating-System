@@ -23,7 +23,7 @@ The Groq key is read only by `api/tapas-ai.ts`; never add it to a `VITE_` variab
 
 - My Files uses IndexedDB for the TAPAS Workspace. Data stays in that browser profile unless the user exports it.
 - Import Files copies user-selected files into the workspace. Export downloads a workspace file.
-- Web Browser opens sites in a new browser tab because many sites block iframe embedding. The installed Tauri app retains its native browser implementation.
+- The Web Browser first tries to show a site inside TAPAS (iframe). Many sites (Google, YouTube, GitHub, Gmail, ...) forbid embedding and stay blank; use the ↗ button in the browser toolbar to open the page in a normal tab. The installed Tauri app uses a native WebView instead.
 - Native operating-system settings, shell access, and unrestricted computer filesystem access are not available to the Web demo.
 - TAPAS AI Web actions are limited to listing the workspace and creating files/folders after user approval.
 

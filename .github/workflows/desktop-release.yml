@@ -50,6 +50,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Address of your hosted TAPAS AI endpoint, e.g. https://your-project.vercel.app/api/tapas-ai
+          # Add it in GitHub: Settings > Secrets and variables > Actions > New repository secret.
+          TAPAS_AI_URL: ${{ secrets.TAPAS_AI_URL }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "TAPAS OS ${{ github.ref_name }}"

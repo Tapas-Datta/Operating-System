@@ -7,7 +7,13 @@ export default function Calculator() {
   const [replace, setReplace] = useState(false);
 
   const digit = (value: string) => {
-    setDisplay((current) => replace || current === "0" ? value : current + value);
+    if (value === ".") {
+      // Start a fresh number with "0." and never allow a second decimal point.
+      setDisplay((current) => replace || current === "Error" ? "0." : current.includes(".") ? current : current + ".");
+      setReplace(false);
+      return;
+    }
+    setDisplay((current) => replace || current === "0" || current === "Error" ? value : current + value);
     setReplace(false);
   };
   const chooseOperator = (next: string) => {

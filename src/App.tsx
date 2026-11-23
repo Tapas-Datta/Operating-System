@@ -78,6 +78,8 @@ type DesktopIconPosition = {
   y: number;
 };
 
+type DesktopContextMenuState = { x: number; y: number; appName: AppName } | null;
+
 type DesktopIconDragState = {
   name: AppName;
   pointerId: number;
@@ -89,7 +91,7 @@ type DesktopIconDragState = {
 };
 
 function AppIcon({ name }: { name: AppName }) {
-  const slug = name.toLowerCase().replace(/\\s+/g, "-");
+  const slug = name.toLowerCase().replace(/\s+/g, "-");
 
   return (
     <span className={`app-icon-art app-icon-${slug}`} aria-hidden="true">
@@ -227,6 +229,18 @@ function loadAppOrder(key: string, includeInstalled = true): AppName[] {
   }
 }
 
+const ICON_COLUMNS = 2;
+const ICON_STEP_X = 100;
+const ICON_STEP_Y = 112;
+
+function slotPosition(index: number): DesktopIconPosition {
+  const baseX = Math.max(24, window.innerWidth - 220);
+  return {
+    x: Math.max(0, Math.min(window.innerWidth - 100, baseX + (index % ICON_COLUMNS) * ICON_STEP_X)),
+    y: 40 + Math.floor(index / ICON_COLUMNS) * ICON_STEP_Y,
+  };
+}
+
 function loadDesktopPositions(): Record<AppName, DesktopIconPosition> {
   const baseX = Math.max(24, window.innerWidth - 220);
 
@@ -245,15 +259,23 @@ function loadDesktopPositions(): Record<AppName, DesktopIconPosition> {
       localStorage.getItem("tapas-desktop-icon-positions") || "{}"
     );
 
-    for (const app of APPS) {
-      const position = saved[app.name];
+    // Restore saved positions for built-in apps AND installed store apps.
+    const knownNames = new Set<string>([
+      ...APPS.map((app) => app.name),
+      ...BUILT_IN_APPS.map((app) => app.id),
+      ...WEB_APPS.map((app) => app.id),
+    ]);
 
+    for (const [name, position] of Object.entries(
+      (saved && typeof saved === "object" ? saved : {}) as Record<string, DesktopIconPosition>
+    )) {
       if (
+        knownNames.has(name) &&
         position &&
         Number.isFinite(position.x) &&
         Number.isFinite(position.y)
       ) {
-        defaults[app.name] = {
+        defaults[name] = {
           x: position.x,
           y: position.y,
         };
@@ -267,7 +289,7 @@ function loadDesktopPositions(): Record<AppName, DesktopIconPosition> {
 }
 
 const TOP_BAR_HEIGHT = 48;
-const DOCK_RESERVED_HEIGHT = 88;
+const DOCK_RESERVED_HEIGHT = 124;
 const MIN_WIDTH = 220;
 const MIN_HEIGHT = 160;
 const SNAP_DISTANCE = 18;
@@ -321,6 +343,8 @@ function App() {
   const [search, setSearch] = useState("");
   const [installedApps, setInstalledApps] =
     useState<StoreApp["id"][]>(loadInstalledApps);
+  const [desktopContextMenu, setDesktopContextMenu] =
+    useState<DesktopContextMenuState>(null);
 
   useEffect(() => {
     localStorage.setItem(
@@ -342,6 +366,7 @@ function App() {
   const [browserLaunchRequest, setBrowserLaunchRequest] = useState<{
     id: number;
     url: string;
+    title: string;
   } | null>(null);
 
   const [openFolderRequest, setOpenFolderRequest] = useState<{
@@ -406,13 +431,22 @@ function App() {
       current.includes(name) ? current : [...current, name]
     );
 
-    setDesktopPositions((current) => ({
-      ...current,
-      [name]: current[name] ?? {
-        x: Math.max(24, window.innerWidth - 220),
-        y: 40 + Math.max(0, installedApps.length) * 8,
-      },
-    }));
+    // Put the new icon in the next free grid slot instead of on top of another icon.
+    setDesktopPositions((current) => {
+      if (current[name]) return current;
+      const taken = Object.values(current);
+      let index = 0;
+      while (
+        index < 200 &&
+        taken.some((p) => {
+          const slot = slotPosition(index);
+          return Math.abs(p.x - slot.x) < 60 && Math.abs(p.y - slot.y) < 60;
+        })
+      ) {
+        index += 1;
+      }
+      return { ...current, [name]: slotPosition(index) };
+    });
   };
 
   const uninstallApp = (name: StoreApp["id"]) => {
@@ -744,13 +778,9 @@ function App() {
 
     if (name === "Sicily AI" || storeWebApp) {
       const url = storeWebApp?.url ?? "https://sicily-ai.vercel.app/";
-      if (!isDesktop()) {
-        const opened = window.open(url, "_blank", "noopener,noreferrer");
-        if (!opened) window.alert("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
-        closeStartMenu();
-        return;
-      }
-      setBrowserLaunchRequest({ id: Date.now(), url });
+      // Keep web-app launches inside the TAPAS Browser in both editions.
+      // The web edition uses an iframe and clearly reports sites that refuse embedding.
+      setBrowserLaunchRequest({ id: Date.now(), url, title: storeWebApp?.id ?? "Sicily AI" });
     }
 
     const nextZ = zCounter + 1;
@@ -1083,6 +1113,17 @@ function App() {
     openApp("My Files");
   };
 
+  // The native browser view is drawn above all HTML, so it must be hidden
+  // whenever anything else should appear on top of it.
+  const topVisibleZ = Math.max(0, ...windows.filter((w) => !w.minimized).map((w) => w.z));
+  const browserWindow = windows.find((w) => w.name === "Browser");
+  const browserVisible =
+    !!browserWindow &&
+    !browserWindow.minimized &&
+    browserWindow.z === topVisibleZ &&
+    !startMenu &&
+    !controlCenterOpen;
+
   // Render application content
   const renderContent = (name: AppName) => {
     // My Files application
@@ -1097,7 +1138,7 @@ function App() {
 
     // Browser application
     if (name === "Browser") {
-      return <Browser launchRequest={browserLaunchRequest} />;
+      return <Browser launchRequest={browserLaunchRequest} visible={browserVisible} />;
     }
 
     // Settings application
@@ -1358,6 +1399,17 @@ function App() {
               onPointerDown={(event) =>
                 startDesktopIconDrag(app.name, event)
               }
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const menuWidth = 190;
+                const menuHeight = 92;
+                setDesktopContextMenu({
+                  x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+                  y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+                  appName: app.name,
+                });
+              }}
               onClick={() => handleAppClick(app.name)}
             >
               <AppIcon name={app.name} />
@@ -1366,6 +1418,51 @@ function App() {
             </button>
           ))}
         </div>
+
+        {desktopContextMenu && (
+          <>
+            <button
+              className="desktop-context-dismiss"
+              aria-label="Close app menu"
+              onClick={() => setDesktopContextMenu(null)}
+            />
+            <div
+              className="desktop-context-menu"
+              style={{ left: desktopContextMenu.x, top: desktopContextMenu.y }}
+              role="menu"
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <div className="desktop-context-title">{desktopContextMenu.appName}</div>
+              <button
+                role="menuitem"
+                className="desktop-context-item"
+                onClick={() => {
+                  handleAppClick(desktopContextMenu.appName);
+                  setDesktopContextMenu(null);
+                }}
+              >
+                Open
+              </button>
+              {installedApps.includes(desktopContextMenu.appName as StoreApp["id"]) ? (
+                <button
+                  role="menuitem"
+                  className="desktop-context-item danger"
+                  onClick={() => {
+                    const appName = desktopContextMenu.appName as StoreApp["id"];
+                    setDesktopContextMenu(null);
+                    if (window.confirm(`Uninstall ${appName} from TAPAS OS?`)) {
+                      uninstallApp(appName);
+                    }
+                  }}
+                >
+                  Uninstall
+                </button>
+              ) : (
+                <div className="desktop-context-hint">Built-in app · Cannot uninstall</div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* AI Widget */}
         <div className="ai-widget">

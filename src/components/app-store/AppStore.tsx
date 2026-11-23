@@ -32,6 +32,14 @@ export const WEB_APPS: StoreApp[] = [
   { id: "Google Calendar", icon: "🗓️", description: "Plan events, meetings, and your daily schedule.", category: "Productivity", url: "https://calendar.google.com/" },
   { id: "Spotify", icon: "🎧", description: "Listen to music, podcasts, and playlists.", category: "Media", url: "https://open.spotify.com/" },
   { id: "Google Maps", icon: "🗺️", description: "Explore places, find directions, and plan journeys.", category: "Utilities", url: "https://maps.google.com/" },
+  { id: "Discord", icon: "💬", description: "Join communities and communicate with voice, video, and text.", category: "Communication", url: "https://discord.com/app" },
+  { id: "Slack", icon: "🟣", description: "Collaborate with teams through channels and messages.", category: "Communication", url: "https://app.slack.com/" },
+  { id: "Trello", icon: "📋", description: "Organize tasks and projects with visual boards.", category: "Productivity", url: "https://trello.com/" },
+  { id: "WhatsApp", icon: "🟢", description: "Send messages and stay connected with WhatsApp Web.", category: "Communication", url: "https://web.whatsapp.com/" },
+  { id: "Telegram", icon: "✈️", description: "Message people and groups using Telegram Web.", category: "Communication", url: "https://web.telegram.org/" },
+  { id: "Reddit", icon: "👽", description: "Explore communities and discussions.", category: "Social", url: "https://www.reddit.com/" },
+  { id: "Netflix", icon: "🎬", description: "Stream films and series with an eligible subscription.", category: "Media", url: "https://www.netflix.com/" },
+  { id: "Microsoft 365", icon: "🧩", description: "Access Microsoft productivity tools online.", category: "Productivity", url: "https://www.microsoft365.com/" },
 ];
 
 export const STORE_CATALOG: StoreApp[] = [...BUILT_IN_APPS, ...WEB_APPS];
@@ -43,7 +51,7 @@ type Props = {
   onOpen: (app: StoreApp) => void;
 };
 
-const CATEGORIES = ["All", "Productivity", "Development", "Education", "Design", "Media", "Utilities"];
+const CATEGORIES = ["All", "Productivity", "Development", "Education", "Design", "Media", "Utilities", "Communication", "Social"];
 
 export default function AppStore({ installedApps, onInstall, onUninstall, onOpen }: Props) {
   const [search, setSearch] = useState("");
